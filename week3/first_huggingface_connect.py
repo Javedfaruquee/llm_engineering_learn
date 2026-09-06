@@ -40,6 +40,9 @@ try:
     pipe = AutoPipelineForText2Image.from_pretrained(
         "stabilityai/sdxl-turbo", torch_dtype=dtype, variant="fp16"
     )
+    # pipe = AutoPipelineForText2Image.from_pretrained(
+    #     "stabilityai/sdxl-turbo" or "stabilityai/stable-diffusion-xl-refiner-1.0", torch_dtype=dtype, variant="fp16"
+    # )
     pipe.to(device)
     report_vram("After loading")
 
