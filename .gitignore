@@ -80,6 +80,12 @@ vector_db/
 /*.wav
 /*.mp3
 
+# week3/mom_from_audiofile.py: the 14 MB course recording (re-downloadable from the
+# link in the script) and what it derives from it.
+/week3/denver_extract.mp3
+/week3/denver_extract_transcript.txt
+/week3/denver_extract_minutes.md
+
 # ---- Logs & local scratch output ----
 *.log
 report.txt
