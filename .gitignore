@@ -5,6 +5,7 @@
 
 # ---- Virtual environments ----
 .venv/
+.venv-*/
 venv/
 env/
 ENV/
@@ -57,6 +58,27 @@ gradio_cached_examples/
 .chroma/
 chroma_db/
 vector_db/
+
+# ---- Model weights / checkpoints (the HF cache lives in ~/.cache, this is for local saves) ----
+*.safetensors
+*.gguf
+*.bin
+*.pt
+*.pth
+*.ckpt
+*.onnx
+
+# ---- Script output written to the repo root ----
+# Anchored with a leading / so assets inside week folders can still be committed.
+# SQLite databases from the airline assistant, images from the diffusers demos,
+# audio from the text-to-speech demos.
+/*.db
+/*.db-journal
+/*.sqlite3
+/*.png
+/*.jpg
+/*.wav
+/*.mp3
 
 # ---- Logs & local scratch output ----
 *.log
