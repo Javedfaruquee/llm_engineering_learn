@@ -42,6 +42,8 @@ if hf_token:
 # ROCm builds expose the AMD GPU through the torch.cuda API (HIP presents as CUDA),
 # so "cuda" here covers both the NVIDIA and the Radeon 8060S case.
 # CPU is the fallback, and it needs float32: fp16 math is unsupported there.
+# MPS is the Apple GPU backend, and it supports fp16 math, so it can run the same demos as CUDA, 
+# but it is slower and has a smaller VRAM budget.
 if torch.cuda.is_available():
     device, dtype = "cuda", torch.float16
     backend = f"ROCm {torch.version.hip}" if torch.version.hip else f"CUDA {torch.version.cuda}"
@@ -89,7 +91,8 @@ def sentiment_analysis():
     print(analyser("I should be more excited to be on the way to LLM mastery!!"))
 
 
-# Named Entity Recognition
+# Named Entity Recognition, it tags words for their entity type, 
+# like PER for person, LOC for location, ORG for organization, MISC for miscellaneous etc..
 
 def named_entity_recognition():
     # aggregation_strategy="simple" stitches word pieces back together, so "Ed Donner"

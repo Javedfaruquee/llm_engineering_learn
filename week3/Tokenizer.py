@@ -73,22 +73,6 @@ def report_vram(label):
         free, total = torch.cuda.mem_get_info()
         print(f"{label}: {(total - free) / 1024**3:.1f} GB used of {total / 1024**3:.1f} GB")
 
-
-def run(label, demo):
-    """Run one demo, then hand its VRAM back.
-
-    Each demo holds its model in a local, so the reference is gone by the time the
-    call returns - which is what empty_cache() needs, since it only releases blocks
-    that nothing still points at. Ten models stacked in one process would otherwise
-    sit on ~15 GB by the end.
-    """
-    print(f"\n=== {label} ===")
-    demo()
-    gc.collect()
-    if device == "cuda":
-        torch.cuda.empty_cache()
-    report_vram("after cleanup")
-
 # Tokenizer demo LLAMA is gated, so it needs an accepted licence plus HF_TOKEN; the rest are public.
 tokenizer = AutoTokenizer.from_pretrained(LLAMA, trust_remote_code=True)
 text = "I am excited to show Tokenizers in action to my LLM engineers"
@@ -166,10 +150,10 @@ print("\n")
 # above is string-to-integer bookkeeping, which is pure CPU work: a tokenizer has no
 # matrix maths to offload. Only once the ids reach a model is there anything to run.
 
-def report_vram(label):
-    if device == "cuda":
-        free, total = torch.cuda.mem_get_info()
-        print(f"{label}: {(total - free) / 1024**3:.1f} GB used of {total / 1024**3:.1f} GB")
+# def report_vram(label):
+#     if device == "cuda":
+#         free, total = torch.cuda.mem_get_info()
+#         print(f"{label}: {(total - free) / 1024**3:.1f} GB used of {total / 1024**3:.1f} GB")
 
 
 def generate_with_phi4():
