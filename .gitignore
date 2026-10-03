@@ -86,6 +86,9 @@ vector_db/
 /week3/denver_extract_transcript.txt
 /week3/denver_extract_minutes.md
 
+# week3/visualizer.py: the token prediction graph it renders
+/week3/token_predictions.png
+
 # ---- Logs & local scratch output ----
 *.log
 report.txt

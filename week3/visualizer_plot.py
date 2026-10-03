@@ -102,10 +102,17 @@ def create_token_graph(model_name: str, predictions: List[Dict]) -> nx.DiGraph:
     return G
 
 
-def visualize_predictions(G: nx.DiGraph, figsize=(14, 80)):
+def visualize_predictions(G: nx.DiGraph, figsize=None):
     """
     Visualize the token prediction graph with vertical layout and alternating alternatives.
+
+    By default the height grows with the number of tokens: node sizes and fonts
+    are fixed in points, so a fixed height makes long answers overlap.
     """
+    if figsize is None:
+        rows = sum(1 for n in G.nodes() if "_alt" not in n)
+        # ~1.3in per row clears a size-6000 node (about 1.07in across)
+        figsize = (14, max(8, rows * 1.3))
     plt.figure(figsize=figsize)
 
     # Create custom positioning for nodes
