@@ -1,0 +1,24 @@
+# Run from the week5 folder:
+#   docker compose --env-file ../.env up -d --build     # build and start on http://localhost:7860
+#   docker compose logs -f                               # watch crawling / refreshes
+#   docker compose exec signpath-rag python Signpath_RAG.py --refresh --eval   # refresh now and check answers
+#   docker compose down                                  # stop (the data volume is kept)
+#
+# Only OPENAI_API_KEY is passed into the container, not the rest of the .env file.
+
+services:
+  signpath-rag:
+    build: .
+    image: signpath-rag
+    container_name: signpath-rag
+    ports:
+      - "7860:7860"
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY must be set - pass --env-file ../.env}
+      # SIGNPATH_REFRESH_HOURS: "24"   # override the script's default re-crawl interval
+    volumes:
+      - signpath-data:/data
+    restart: unless-stopped
+
+volumes:
+  signpath-data:

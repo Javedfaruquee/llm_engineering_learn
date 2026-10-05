@@ -79,8 +79,6 @@ def additional_context(message):
 
 def chat(message, history):
     system_message = SYSTEM_PREFIX + additional_context(message)
-    # Gradio 6 history has extra keys (metadata, options) and content as a list of parts; OpenAI needs plain role/content
-    history = [{"role": h["role"], "content": "".join(part["text"] for part in h["content"] if part.get("type") == "text")} for h in history]
     messages = [{"role": "system", "content": system_message}] + history + [{"role": "user", "content": message}]
     response = openai.chat.completions.create(model=MODEL, messages=messages)
     return response.choices[0].message.content

@@ -1,0 +1,5 @@
+# Only the app and its requirements go into the image; data lives in the /data volume
+*
+!Signpath_RAG.py
+!signpath_retrieval_tests.json
+!requirements-signpath.txt
