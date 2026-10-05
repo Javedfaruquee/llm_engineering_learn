@@ -2,6 +2,40 @@
 .env
 .env.*
 !.env.example
+*.env
+.envrc
+
+# ---- Credentials, keys and certificates (never commit) ----
+# Private keys and certificate stores (code-signing PFX/P12, TLS keys, Java keystores)
+*.pem
+*.key
+*.pfx
+*.p12
+*.jks
+*.keystore
+*.ppk
+id_rsa*
+id_ed25519*
+id_ecdsa*
+# Cloud / OAuth credential files
+credentials.json
+credentials*.json
+client_secret*.json
+service-account*.json
+service_account*.json
+token.json
+token.pickle
+secrets.json
+secrets.toml
+.secrets/
+.aws/
+.azure/
+# Tool config files that can hold tokens
+.netrc
+.pypirc
+.npmrc
+# Password databases
+*.kdbx
 
 # ---- Virtual environments ----
 .venv/
