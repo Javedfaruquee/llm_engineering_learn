@@ -51,6 +51,7 @@ RERANK_CANDIDATES = 30     # candidates given to the re-ranker
 CONTEXT_K = 8              # chunks given to the LLM
 RERANK_MIN_SCORE = -4.0    # if the best re-rank score is below this, the docs don't cover the question
 RERANK_KEEP_SCORE = -8.0   # chunks scoring below this are never given to the LLM
+RELATIVE_CUTOFF = 3.0      # ... nor chunks scoring more than this below the best one (see search, step 5)
 MAX_IMAGES = 6             # images shown under an answer
 BLEND_K = 10               # how strongly top positions count when blending re-rank order with search order
 CHANGELOG_SECTION = "Product updates"   # changelog entries are only searched for release/version questions
@@ -309,11 +310,19 @@ def search(query):
         candidate["blended"] = 1 / (BLEND_K + rank) + 1 / (BLEND_K + candidate["fused_rank"])
     candidates.sort(key=blended_score, reverse=True)
 
-    # 5. Pick up to CONTEXT_K chunks for the LLM, best first. Skip chunks below RERANK_KEEP_SCORE, and
+    # 5. Pick up to CONTEXT_K chunks for the LLM, best first. Skip chunks below the keep score, and
     #    code/image chunks whose content is already inside a chosen text chunk (no point sending it twice).
+    #    Adaptive cut-off: a chunk must also score within RELATIVE_CUTOFF of the best chunk. When one section
+    #    clearly answers the question, near-misses from other pages are left out (less noise, fewer tokens);
+    #    when several sections score alike (combined questions), they all still go.
+    best_score = candidates[0]["rerank"]
+    for candidate in candidates:
+        if candidate["rerank"] > best_score:
+            best_score = candidate["rerank"]
+    keep_from = max(RERANK_KEEP_SCORE, best_score - RELATIVE_CUTOFF)
     selected = []
     for candidate in candidates:
-        if candidate["rerank"] < RERANK_KEEP_SCORE:
+        if candidate["rerank"] < keep_from:
             continue      # not "break": after blending, a weaker chunk can come before a stronger one
         if is_duplicate(candidate, selected):
             continue
