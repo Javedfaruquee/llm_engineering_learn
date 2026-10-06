@@ -20,6 +20,7 @@ import json
 import math
 import os
 import re
+import time
 import warnings
 from pathlib import Path
 
@@ -58,6 +59,7 @@ CHANGELOG_SECTION = "Product updates"   # changelog entries are only searched fo
 CHANGELOG_QUESTION = re.compile(r"\b(release|released|version|versions|changelog|new in|what's new|"
                                 r"update|updated|deprecat\w*)\b", re.I)
 OPEN_BROWSER = os.getenv("SIGNPATH_OPEN_BROWSER", "1") == "1"
+UI_UPDATE_SECONDS = float(os.getenv("SIGNPATH_UI_UPDATE_SECONDS", "0.15"))   # stream to the browser in batches at most this often (see respond)
 
 NO_ANSWER = "I don't have information about that in the SignPath documentation I have indexed."
 
@@ -774,9 +776,20 @@ def respond(message, history):
 
     try:
         images = []
+        # Every update re-sends the whole chat (images included) to the browser, which redraws it. Updating on
+        # every token made long chats crawl (measured: 109 tok/s on screen for the 1st answer, 22 by the 4th), so
+        # the text is sent in small batches, at most every UI_UPDATE_SECONDS. The final update is always sent.
+        last_update = 0.0
+        pending = None
         for answer, sources, images, details in answer_question(message, previous):
             history[answer_position] = {"role": "assistant", "content": answer}
-            yield "", history, sources or gr.skip(), details
+            pending = ("", history, sources or gr.skip(), details)
+            if sources or time.monotonic() - last_update >= UI_UPDATE_SECONDS:
+                last_update = time.monotonic()
+                yield pending
+                pending = None
+        if pending:
+            yield pending
         if images:
             history.append({"role": "assistant", "content": "**Images from the documentation:**"})
             for path, caption in images:

@@ -81,6 +81,7 @@ COLLECTION = "signpath_docs"
 REFRESH_HOURS = float(os.getenv("SIGNPATH_REFRESH_HOURS", "360"))  # background re-crawl interval while the UI runs; 0 = off
 MIN_PAGE_RATIO = 0.8     # a refresh that finds fewer than 80% of the previous pages is treated as a failed crawl
 OPEN_BROWSER = os.getenv("SIGNPATH_OPEN_BROWSER", "1") == "1"
+UI_UPDATE_SECONDS = float(os.getenv("SIGNPATH_UI_UPDATE_SECONDS", "0.15"))  # stream to the browser in batches at most this often (see respond)
 
 LLM_MODEL = "gpt-4.1-mini"
 EMBED_MODEL = "text-embedding-3-large"
@@ -1475,9 +1476,19 @@ def launch_ui(assistant):
         yield "", history, "", ""
         try:
             images = []
+            # Every update re-sends the whole chat (images included) to the browser, which redraws it. Updating on
+            # every token made long chats crawl (measured: 109 tok/s on screen for the 1st answer, 22 by the 4th), so
+            # the text is sent in small batches, at most every UI_UPDATE_SECONDS. The final update is always sent.
+            last_update, pending = 0.0, None
             for answer, sources, images, context in assistant.answer(message, previous):
                 history[answer_index] = {"role": "assistant", "content": answer}
-                yield "", history, sources or gr.skip(), context
+                pending = ("", history, sources or gr.skip(), context)
+                if sources or time.monotonic() - last_update >= UI_UPDATE_SECONDS:
+                    last_update = time.monotonic()
+                    yield pending
+                    pending = None
+            if pending:
+                yield pending
             if images:  # documentation images shown under the answer they belong to
                 history.append({"role": "assistant", "content": "**Images from the documentation:**"})
                 for path, caption in images:
