@@ -1272,6 +1272,7 @@ def evaluate_retrieval(assistant, k=EVAL_K, progress=None):
     by_category = {}                 # category -> list of MRR values (after re-rank)
     per_question, bad_labels = [], []
     out_of_scope = {"total": 0, "rejected": 0}
+    excerpts_sent = []               # how many excerpts the LLM got per answerable question
     false_rejections = 0
 
     for number, test in enumerate(tests, start=1):
@@ -1292,6 +1293,7 @@ def evaluate_retrieval(assistant, k=EVAL_K, progress=None):
         if total_relevant == 0:
             bad_labels.append(relevant_sections)   # a typo in the test file, or the docs were reorganised
         false_rejections += not selected
+        excerpts_sent.append(len(selected))
 
         rankings = {"Vector + keyword": sorted(candidates, key=lambda h: h.fused_rank),
                     "After re-rank": candidates,
@@ -1312,6 +1314,7 @@ def evaluate_retrieval(assistant, k=EVAL_K, progress=None):
         "per_question": per_question,
         "out_of_scope": out_of_scope,
         "false_rejections": false_rejections,
+        "avg_excerpts_sent": sum(excerpts_sent) / max(len(excerpts_sent), 1),
         "bad_labels": bad_labels,
     }
 
@@ -1364,7 +1367,7 @@ EXAMPLES = [
 # Precision is naturally low here (most questions have one relevant section, so most of the top K is
 # neighbouring material), so its thresholds are lower.
 CARD_THRESHOLDS = {"MRR": (0.9, 0.75), "nDCG": (0.85, 0.7), "Recall": (0.9, 0.75), "Precision": (0.4, 0.25),
-                   "Gate": (1.0, 0.8)}
+                   "LLM precision": (0.5, 0.35), "Gate": (1.0, 0.8)}
 CARD_LABELS = {"MRR": "Mean Reciprocal Rank (MRR)", "nDCG": "Normalized DCG (nDCG@{k})",
                "Recall": "Recall@{k}", "Precision": "Precision@{k}"}
 
@@ -1389,6 +1392,12 @@ def evaluation_report(result):
     cards = "".join(metric_card(CARD_LABELS[m].format(k=k), after_rerank[m], CARD_THRESHOLDS[m]) for m in METRICS)
     oos, answerable = result["out_of_scope"], result["answerable"]
     gate_score = (oos["rejected"] + answerable - result["false_rejections"]) / (oos["total"] + answerable)
+    # What the LLM actually reads: the excerpts left after the relevance gate, de-duplication and the adaptive
+    # cut-off. Its precision is what affects answers (noise, tokens); the cards above score the ranked top K.
+    to_llm = result["stages"][2][2]
+    cards += metric_card("Precision of what the LLM reads (excerpts sent)", to_llm["Precision"],
+                         CARD_THRESHOLDS["LLM precision"],
+                         text=f"{to_llm['Precision']:.4f} · {result['avg_excerpts_sent']:.1f} excerpts on average")
     cards += metric_card("Relevance gate (refuses out-of-scope, answers in-scope)", gate_score, CARD_THRESHOLDS["Gate"],
                          text=f"{oos['rejected']}/{oos['total']} rejected · {result['false_rejections']} wrongly")
     cards += ("<div style='margin-top: 20px; padding: 10px; background-color: #d4edda; border-radius: 5px; "
@@ -1508,7 +1517,7 @@ def launch_ui(assistant):
             gr.Markdown("## 🔍 Retrieval evaluation\n"
                         f"Runs the {RETRIEVAL_TESTS_FILE.name} test questions through the search over the vector "
                         "database and checks whether the sections that answer them are found and ranked high. "
-                        "Takes about 3 minutes; one small embedding call per question, no LLM calls.")
+                        "Takes about 4 minutes; one small embedding call per question, no LLM calls.")
             evaluate_button = gr.Button("Run Evaluation", variant="primary", size="lg")
             with gr.Row():
                 with gr.Column(scale=1):
