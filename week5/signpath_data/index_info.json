@@ -1,10 +1,10 @@
 {
  "embed_model": "text-embedding-3-large",
  "pages": 45,
- "chunks": 1132,
- "last_checked": "2026-10-04 14:58 UTC",
- "last_checked_ts": 1791125888.9981894,
- "last_changed": "2026-10-04 14:52 UTC",
+ "chunks": 1422,
+ "last_checked": "2026-10-06 09:03 UTC",
+ "last_checked_ts": 1791277411.2419407,
+ "last_changed": "2026-10-06 09:02 UTC",
  "newest_page_update": "2026-09-30",
  "last_sync": {
   "added_chunks": 0,

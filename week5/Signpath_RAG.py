@@ -87,6 +87,8 @@ EMBED_MODEL = "text-embedding-3-large"
 RERANK_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 
 CHUNK_CHARS = 1800       # target chunk size; code blocks are never split unless huge
+TABLE_MIN_ROWS = 6       # tables with at least this many rows ...
+TABLE_MIN_CHARS = 1200   # ... or this many characters are chunked one row per chunk (see build_chunks)
 VECTOR_K = 25            # candidates from vector search
 KEYWORD_K = 25           # candidates from BM25 keyword search
 RERANK_CANDIDATES = 30   # fused candidates passed to the cross-encoder
@@ -596,6 +598,32 @@ def split_text(text, limit=CHUNK_CHARS):
     return chunks
 
 
+def find_big_tables(text):
+    """Markdown tables with at least TABLE_MIN_ROWS rows or TABLE_MIN_CHARS characters, as
+    (first line, end line, column names, row lines). Small tables stay in the normal text chunks."""
+    lines, tables, i = text.split("\n"), [], 0
+    while i < len(lines):
+        if lines[i].startswith("|") and i + 1 < len(lines) and re.match(r"^\|( --- \|)+$", lines[i + 1]):
+            end = i + 2
+            while end < len(lines) and lines[end].startswith("|"):
+                end += 1
+            rows = lines[i + 2:end]
+            if len(rows) >= TABLE_MIN_ROWS or len("\n".join(lines[i:end])) >= TABLE_MIN_CHARS:
+                columns = [c.strip() for c in lines[i].strip().strip("|").split(" | ")]
+                tables.append((i, end, columns, rows))
+            i = end
+        else:
+            i += 1
+    return tables
+
+
+def row_chunk_text(columns, row):
+    """One table row written out as 'Column: value' lines, e.g. '- Composite format: Yes'."""
+    cells = [c.strip() for c in row.strip().strip("|").split(" | ")]
+    parts = [f"- {name or '(row)'}: {value}" for name, value in zip(columns, cells) if value]
+    return "Table row:\n" + "\n".join(parts)
+
+
 def build_chunks(pages):
     """Chunks with content-based ids, so an unchanged section keeps its id (and embedding) across crawls."""
     chunks = {}
@@ -615,8 +643,23 @@ def build_chunks(pages):
                     "lastmod": page.get("lastmod", ""),
                     "position": page_number * 1000 + number}  # document order, used to sort images
 
-            # Text chunks: the section's prose, code and tables together
-            for piece in split_text(section["text"]):
+            # Big tables (parameter lists, file-format references) become one chunk per row, each repeating the
+            # column names. As one large chunk, a table ranks poorly for a question about one row ("which directive
+            # for VSIX?") and the re-ranker only reads its start; a row chunk states the answer on its own.
+            # In the text chunks the table is replaced by a one-line note. (Tested: table-lookup MRR 0.61 -> 0.88.)
+            section_text = section["text"]
+            tables = find_big_tables(section_text)
+            for _, _, columns, rows in tables:
+                for row in rows:
+                    add("table-row", header + row_chunk_text(columns, row), {**base, "type": "table-row", "lang": ""})
+            if tables:
+                lines = section_text.split("\n")
+                for start, end, columns, _ in reversed(tables):
+                    lines[start:end] = ["(Table with one entry per row: " + " | ".join(columns) + ")"]
+                section_text = "\n".join(lines)
+
+            # Text chunks: the section's prose, code and small tables together
+            for piece in split_text(section_text):
                 add("text", header + piece, {**base, "type": "text", "lang": ""})
 
             # Code chunks: each example with the sentence that introduces it, so "show me an example" ranks well
@@ -688,7 +731,8 @@ def sync_index(client, pages, rebuild=False, page_changes=None):
         collection.delete(ids=stale)
     if new_chunks:
         counts = Counter(c["meta"]["type"] for c in new_chunks)
-        log(f"Embedding {len(new_chunks)} new/changed chunks ({counts['text']} text, {counts['code']} code, {counts['image']} image)...")
+        log(f"Embedding {len(new_chunks)} new/changed chunks ({counts['text']} text, {counts['table-row']} table row, "
+            f"{counts['code']} code, {counts['image']} image)...")
         vectors = embed(client, [c["text"] for c in new_chunks])
         for start in range(0, len(new_chunks), 500):
             batch = new_chunks[start:start + 500]
@@ -940,10 +984,14 @@ rely on the product documentation.
 Follow these rules strictly:
 1. Use ONLY the numbered documentation excerpts in the user's message. Do not use any prior knowledge \
 about SignPath or other products, and never guess.
-2. If the excerpts do not contain the information needed to answer, reply with exactly this sentence \
-and nothing else: "{NO_ANSWER}"
-3. If the excerpts answer only part of the question, answer that part and say clearly which part \
-is not covered by the documentation.
+2. Reply with exactly this sentence and nothing else only when the excerpts contain nothing that helps \
+answer the question: "{NO_ANSWER}". Never combine that sentence with an answer.
+3. Questions can be worded loosely or as fragments ("To sign an MSI inside a ZIP?"); answer what the user \
+means. If no single excerpt covers the exact case but the excerpts document the pieces needed (for example \
+which file types can contain other files and how nested elements are written), combine those pieces into \
+an answer and say that it is put together from the documented elements. If the excerpts answer only part \
+of the question, answer that part and say clearly which part is not covered. Never claim that a product, \
+integration or feature is supported when the excerpts don't mention it; say it isn't mentioned instead.
 4. When the excerpts contain relevant configuration, commands or code, include them as fenced code \
 blocks, copied exactly. Never invent XML elements, attributes, parameters, switches, file paths, URLs \
 or values that are not in the excerpts. If you adapt an example, say so and change only what the \
@@ -971,6 +1019,23 @@ def message_text(message):
     return str(content).split("\n\n**Sources:**")[0]
 
 
+def is_image_caption(text):
+    """The chat shows images as extra messages: an "Images from the documentation" header and an italic caption
+    per image. They carry no conversation, so they're left out of the history used to rewrite follow-ups
+    (otherwise a few images would fill the 6-message window and push out the actual questions)."""
+    text = text.strip()
+    return text == "**Images from the documentation:**" or (text.startswith("_") and text.endswith("_") and "\n" not in text)
+
+
+def remove_stray_refusal(answer):
+    """The LLM sometimes explains what the excerpts say (e.g. "Bitbucket Pipelines isn't mentioned...") and then
+    also appends the refusal sentence. Keep the explanation and drop the sentence; a plain refusal is unchanged."""
+    if NO_ANSWER not in answer or answer.strip().strip('"') == NO_ANSWER:
+        return answer
+    cleaned = answer.replace(f'"{NO_ANSWER}"', "").replace(NO_ANSWER, "").strip()
+    return cleaned or answer
+
+
 class SignPathAssistant:
     def __init__(self):
         self.client = OpenAI()
@@ -981,7 +1046,8 @@ class SignPathAssistant:
         Uses the last 6 messages; the first question of a chat is used as it is."""
         if not history:
             return question
-        transcript = "\n".join(f"{m['role']}: {message_text(m)[:1500]}" for m in history[-6:])
+        conversation = [m for m in history if not is_image_caption(message_text(m))]
+        transcript = "\n".join(f"{m['role']}: {message_text(m)[:1500]}" for m in conversation[-6:])
         response = self.client.chat.completions.create(
             model=LLM_MODEL, temperature=0, seed=42,
             messages=[{"role": "system", "content": CONDENSE_PROMPT},
@@ -1017,6 +1083,7 @@ class SignPathAssistant:
 
         # 4. Find which excerpts the answer cited ([1], [2]...). An uncited "I don't have information" means the
         #    LLM found the excerpts didn't answer the question: show no sources then.
+        answer = remove_stray_refusal(answer)
         cited = sorted({int(n) for n in re.findall(r"\[(\d+)\]", answer) if 0 < int(n) <= len(relevant)})
         if answer.strip().startswith("I don't have information") and not cited:
             yield answer, "_The retrieved documentation did not contain the answer._", [], context_md

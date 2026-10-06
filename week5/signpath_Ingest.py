@@ -60,6 +60,8 @@ COLLECTION = "signpath_docs"
 
 EMBED_MODEL = "text-embedding-3-large"
 CHUNK_CHARS = 1800         # target chunk size; code blocks are only split when they are huge
+TABLE_MIN_ROWS = 6         # tables with at least this many rows ...
+TABLE_MIN_CHARS = 1200     # ... or this many characters are chunked one row per chunk (see build_chunks)
 MIN_PAGE_RATIO = 0.8       # a crawl finding fewer than 80% of the previous pages is treated as failed
 
 SKIP_EXTENSIONS = [".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".ico", ".pdf", ".zip", ".msi", ".exe",
@@ -707,6 +709,44 @@ def add_chunk(chunks, kind, text, metadata):
         chunks[chunk_id] = {"id": chunk_id, "text": text, "meta": metadata}
 
 
+def find_big_tables(text):
+    """Find markdown tables with at least TABLE_MIN_ROWS rows or TABLE_MIN_CHARS characters.
+    Returns a list of dicts: start and end line, column names, and the row lines. Small tables are left alone."""
+    lines = text.split("\n")
+    tables = []
+    i = 0
+    while i < len(lines):
+        is_table_start = (lines[i].startswith("|") and i + 1 < len(lines)
+                          and re.match(r"^\|( --- \|)+$", lines[i + 1]))
+        if not is_table_start:
+            i += 1
+            continue
+        end = i + 2
+        while end < len(lines) and lines[end].startswith("|"):
+            end += 1
+        rows = lines[i + 2:end]
+        table_size = len("\n".join(lines[i:end]))
+        if len(rows) >= TABLE_MIN_ROWS or table_size >= TABLE_MIN_CHARS:
+            columns = []
+            for cell in lines[i].strip().strip("|").split(" | "):
+                columns.append(cell.strip())
+            tables.append({"start": i, "end": end, "columns": columns, "rows": rows})
+        i = end
+    return tables
+
+
+def row_chunk_text(columns, row):
+    """One table row written out as 'Column: value' lines, e.g. '- Composite format: Yes'."""
+    cells = []
+    for cell in row.strip().strip("|").split(" | "):
+        cells.append(cell.strip())
+    parts = []
+    for name, value in zip(columns, cells):
+        if value:
+            parts.append("- " + (name or "(row)") + ": " + value)
+    return "Table row:\n" + "\n".join(parts)
+
+
 def make_metadata(base, kind, language, images):
     metadata = dict(base)
     metadata["type"] = kind
@@ -736,8 +776,25 @@ def build_chunks(pages):
             base = {"url": url, "page": page["title"], "section": section_name,
                     "lastmod": page.get("lastmod", ""), "position": page_number * 1000 + section_number}
 
-            # Text chunks: the section's prose, code and tables together
-            for piece in split_text(section["text"]):
+            # Big tables (parameter lists, file-format references) become one chunk per row, each repeating the
+            # column names. As one large chunk, a table ranks poorly for a question about one row ("which directive
+            # for VSIX?"); a row chunk states the answer on its own. In the text chunks the table is replaced by a
+            # one-line note.
+            section_text = section["text"]
+            tables = find_big_tables(section_text)
+            for table in tables:
+                for row in table["rows"]:
+                    add_chunk(chunks, "table-row", header + row_chunk_text(table["columns"], row),
+                              make_metadata(base, "table-row", "", section_images))
+            if tables:
+                lines = section_text.split("\n")
+                for table in reversed(tables):
+                    note = "(Table with one entry per row: " + " | ".join(table["columns"]) + ")"
+                    lines[table["start"]:table["end"]] = [note]
+                section_text = "\n".join(lines)
+
+            # Text chunks: the section's prose, code and small tables together
+            for piece in split_text(section_text):
                 add_chunk(chunks, "text", header + piece, make_metadata(base, "text", "", section_images))
 
             # Code chunks: each example with the sentence before it, so "show me an example" finds it

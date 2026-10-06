@@ -72,10 +72,14 @@ rely on the product documentation.
 Follow these rules strictly:
 1. Use ONLY the numbered documentation excerpts in the user's message. Do not use any prior knowledge \
 about SignPath or other products, and never guess.
-2. If the excerpts do not contain the information needed to answer, reply with exactly this sentence \
-and nothing else: "{NO_ANSWER}"
-3. If the excerpts answer only part of the question, answer that part and say clearly which part \
-is not covered by the documentation.
+2. Reply with exactly this sentence and nothing else only when the excerpts contain nothing that helps \
+answer the question: "{NO_ANSWER}". Never combine that sentence with an answer.
+3. Questions can be worded loosely or as fragments ("To sign an MSI inside a ZIP?"); answer what the user \
+means. If no single excerpt covers the exact case but the excerpts document the pieces needed (for example \
+which file types can contain other files and how nested elements are written), combine those pieces into \
+an answer and say that it is put together from the documented elements. If the excerpts answer only part \
+of the question, answer that part and say clearly which part is not covered. Never claim that a product, \
+integration or feature is supported when the excerpts don't mention it; say it isn't mentioned instead.
 4. When the excerpts contain relevant configuration, commands or code, include them as fenced code \
 blocks, copied exactly. Never invent XML elements, attributes, parameters, switches, file paths, URLs \
 or values that are not in the excerpts. If you adapt an example, say so and change only what the \
@@ -359,12 +363,37 @@ def message_text(message):
     return str(content).split("\n\n**Sources:**")[0]
 
 
+def is_image_caption(text):
+    """The chat shows images as extra messages: an "Images from the documentation" header and an italic caption
+    per image. They carry no conversation, so they're left out of the history used to rewrite follow-ups
+    (otherwise a few images would fill the 6-message window and push out the actual questions)."""
+    text = text.strip()
+    if text == "**Images from the documentation:**":
+        return True
+    return text.startswith("_") and text.endswith("_") and "\n" not in text
+
+
+def remove_stray_refusal(answer):
+    """The LLM sometimes explains what the excerpts say (e.g. "Bitbucket Pipelines isn't mentioned...") and then
+    also appends the refusal sentence. Keep the explanation and drop the sentence; a plain refusal is unchanged."""
+    if NO_ANSWER not in answer or answer.strip().strip('"') == NO_ANSWER:
+        return answer
+    cleaned = answer.replace('"' + NO_ANSWER + '"', "").replace(NO_ANSWER, "").strip()
+    if cleaned:
+        return cleaned
+    return answer
+
+
 def rewrite_question(question, history):
     """Turn a follow-up like 'and how do I test it?' into a standalone question."""
     if not history:
         return question
+    conversation = []
+    for message in history:
+        if not is_image_caption(message_text(message)):
+            conversation.append(message)
     transcript = ""
-    for message in history[-6:]:
+    for message in conversation[-6:]:
         transcript += message["role"] + ": " + message_text(message)[:1500] + "\n"
     response = openai_client.chat.completions.create(
         model=LLM_MODEL, temperature=0, seed=42,
@@ -395,6 +424,8 @@ def answer_question(question, history):
         if event.choices and event.choices[0].delta.content:
             answer += event.choices[0].delta.content
             yield answer, "", [], details
+
+    answer = remove_stray_refusal(answer)
 
     # Which excerpts did the answer cite?
     cited = []
