@@ -2,4 +2,5 @@
 *
 !Signpath_RAG.py
 !signpath_retrieval_tests.json
-!requirements-signpath.txt
+!signpath_heldout_tests.json
+!requirements.txt

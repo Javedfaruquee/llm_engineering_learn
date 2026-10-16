@@ -9,10 +9,10 @@ Chroma vector database by signpath_Ingest.py. For each question it:
   4. asks the LLM to answer from the best chunks only, citing them, and shows their images.
 
 Usage (from the project root, with the .venv; run signpath_Ingest.py first):
-    .venv/Scripts/python.exe week5/signpath_answer.py                        # open the chat UI
-    .venv/Scripts/python.exe week5/signpath_answer.py --ask "How do I sign with GPG?"   # answer in the terminal
-    .venv/Scripts/python.exe week5/signpath_answer.py --eval                 # check the answers to known questions
-    .venv/Scripts/python.exe week5/signpath_answer.py --eval-retrieval       # measure search quality (MRR, nDCG...)
+    .venv/Scripts/python.exe SignPath_RAG/signpath_answer.py                        # open the chat UI
+    .venv/Scripts/python.exe SignPath_RAG/signpath_answer.py --ask "How do I sign with GPG?"   # answer in the terminal
+    .venv/Scripts/python.exe SignPath_RAG/signpath_answer.py --eval                 # check the answers to known questions
+    .venv/Scripts/python.exe SignPath_RAG/signpath_answer.py --eval-retrieval       # measure search quality (MRR, nDCG...)
 """
 
 import argparse

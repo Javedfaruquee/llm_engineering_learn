@@ -9,10 +9,10 @@ Run it whenever you want to pick up changes in the docs (for example once a day 
 Only new or changed chunks are embedded again, so a run with no changes costs nothing.
 
 Usage (from the project root, with the .venv):
-    .venv/Scripts/python.exe week5/signpath_Ingest.py              # crawl and update the database
-    .venv/Scripts/python.exe week5/signpath_Ingest.py --rebuild    # crawl and re-embed everything
+    .venv/Scripts/python.exe SignPath_RAG/signpath_Ingest.py              # crawl and update the database
+    .venv/Scripts/python.exe SignPath_RAG/signpath_Ingest.py --rebuild    # crawl and re-embed everything
 
-Then start the chat UI with week5/signpath_answer.py.
+Then start the chat UI with SignPath_RAG/signpath_answer.py.
 """
 
 import argparse

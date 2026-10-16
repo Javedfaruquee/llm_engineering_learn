@@ -997,7 +997,7 @@
    }
   ],
   "source": "SignPath Documentation",
-  "lastmod": "2026-08-17",
+  "lastmod": "2026-10-06",
   "hash": "b7f381360a2ff9b5827e81f727d95104a71048a1"
  },
  {
@@ -1079,7 +1079,7 @@
    }
   ],
   "source": "SignPath Documentation",
-  "lastmod": "2026-08-17",
+  "lastmod": "2026-10-06",
   "hash": "3977dd290bbe32b5298404497c69a87b9a8bcd38"
  },
  {
@@ -1094,7 +1094,7 @@
      "File formats and supported code signing directives"
     ],
     "anchor": "file-elements",
-    "text": "| Element | Composite format | Signing directives | Extensions | Description |\n| --- | --- | --- | --- | --- |\n| `<pe-file>` | No | `<authenticode-sign>` | .exe, .dll, .acm, .ax, .cpl, .drv, .efi, .mui, .ocx, .scr, .sys, .tsp | Portable Executable (PE) files: EXE, DLL, and other executable files |\n| `<powershell-file>` | No | `<authenticode-sign>` | .ps1, .psm1, psd1, .psdc1, .ps1xml | PowerShell scripts and modules |\n| `<windows-script-file>` | No | `<authenticode-sign>` | .wsf, ,vbs, .js | Scripts for Windows Scripting Host, typically VBScript and JScript |\n| `<msi-file>` | Yes | `<authenticode-sign>` | .msi, .msm, .msp | Microsoft installer files |\n| `<cab-file>` | Yes | `<authenticode-sign>` | .cab | Windows cabinet files |\n| `<catalog-file>` | No | `<authenticode-sign>` | .cat | Windows catalog files |\n| `<appx-file>` | Yes | `<authenticode-sign>` | .appx, .appxbundle | App packages for Microsoft Store/Universal Windows Platform |\n| `<msix-file>` | Yes | `<authenticode-sign>` | .msix, .msixbundle | MSIX installer app packages for Microsoft Windows |\n| `<opc-file>` | Yes | `<opc-sign>` | .vsix, .xps, hlkx, … | Open Packaging Conventions (OPC) files including Visual Studio Extensions (VSIX) and Hardware Lab Kit driver signing packages |\n| `<nupkg-file>` | Yes | `<nuget-sign>` | .nupkg | NuGet packages |\n| `<jar-file>` | Yes | `<jar-sign>` | .jar, .war, .ear, .aab | Java packages/archives |\n| `<apk-file>` | No | `<apk-sign>` | .apk | Android app packages |\n| `<rpm-file>` | No | `<rpm-sign>` | .rpm | RPM Package Manager files |\n| `<deb-file>` | No | `<debsigs-sign>` | .deb | Debian package files |\n| `<zip-file>` | Yes | `<jar-sign>` | .zip | Use ZIP archives to sign multiple files at once or to add additional files: enveloped and detached signatures, and attestations. (ZIP archives can also be signed like JAR files.) |\n| `<office-oxml-file>` | No | `<office-macro-sign>` | .xlsm, .xltm, .docm, .dotm, .pptm, .potm, .vsdm, vstm, … | Sign VBA macros in Microsoft Office Open XML files and templates: Excel, Word, PowerPoint and Visio |\n| `<office-binary-file>` | No | `<office-macro-sign>` | .xls, .xlt, .doc, .dot, .pot, .ppa, .pps, .ppt, .mpp, .mpt, .pub, .vsd, .vst, … | Sign VBA macros in binary Microsoft Office files and templates: Project, Publisher, and legacy Excel, Word, PowerPoint and Visio |\n| `<xml-file>` | No | `<xml-sign>` | .xml | Sign XML files using XMLDSIG |\n| `<json-file>` | No | `<jsf-sign>` | .json | Sign JSON files using JSON Signature Format (JSF). |\n| `<oci-image-layout-archive-file>` | No | `<notation-sign>`, `<cosign-sign>` | .tar | Sign container images uploaded in an OCI layout file. |\n| `<directory>` | Yes | `<clickonce-sign>` |  | Specify directories within composite files, e.g. ZIP, MSI, or other directories. Can also be used to sign ClickOnce files and VSTO add-ins. |\n| `<file>` | No | `<dsse-sign>`, `<smime-sign>`, `<create-cms-signature>`, `<create-gpg-signature>`, `<create-raw-signature>`, `<custom-sign>`, `<create-custom-signature>`, | * | Create generic signatures and custom signatures for arbitrary files: DSSE, S/MIME, CMS/PKCS #7, GPG/OpenPGP, raw signatures |",
+    "text": "| Element | Composite format | Signing directives | Extensions | Description |\n| --- | --- | --- | --- | --- |\n| `<pe-file>` | No | `<authenticode-sign>` | .exe, .dll, .acm, .ax, .cpl, .drv, .efi, .mui, .ocx, .scr, .sys, .tsp | Portable Executable (PE) files: EXE, DLL, and other executable files |\n| `<powershell-file>` | No | `<authenticode-sign>` | .ps1, .psm1, psd1, .psdc1, .ps1xml | PowerShell scripts and modules |\n| `<windows-script-file>` | No | `<authenticode-sign>` | .wsf, ,vbs, .js | Scripts for Windows Scripting Host, typically VBScript and JScript |\n| `<msi-file>` | Yes | `<authenticode-sign>` | .msi, .msm, .msp | Microsoft installer files |\n| `<cab-file>` | Yes | `<authenticode-sign>` | .cab | Windows cabinet files |\n| `<catalog-file>` | No | `<authenticode-sign>` | .cat | Windows catalog files |\n| `<appx-file>` | Yes | `<authenticode-sign>` | .appx, .appxbundle | App packages for Microsoft Store/Universal Windows Platform |\n| `<msix-file>` | Yes | `<authenticode-sign>` | .msix, .msixbundle | MSIX installer app packages for Microsoft Windows |\n| `<opc-file>` | Yes | `<opc-sign>` | .vsix, .xps, hlkx, … | Open Packaging Conventions (OPC) files including Visual Studio Extensions (VSIX) and Hardware Lab Kit driver signing packages |\n| `<nupkg-file>` | Yes | `<nuget-sign>` | .nupkg | NuGet packages |\n| `<jar-file>` | Yes | `<jar-sign>` | .jar, .war, .ear, .aab | Java packages/archives |\n| `<apk-file>` | No | `<create-apk-signature>` | .apk | Android app packages |\n| `<rpm-file>` | No | `<rpm-sign>` | .rpm | RPM Package Manager files |\n| `<deb-file>` | No | `<debsigs-sign>` | .deb | Debian package files |\n| `<zip-file>` | Yes | `<jar-sign>` | .zip | Use ZIP archives to sign multiple files at once or to add additional files: enveloped and detached signatures, and attestations. (ZIP archives can also be signed like JAR files.) |\n| `<office-oxml-file>` | No | `<office-macro-sign>` | .xlsm, .xltm, .docm, .dotm, .pptm, .potm, .vsdm, vstm, … | Sign VBA macros in Microsoft Office Open XML files and templates: Excel, Word, PowerPoint and Visio |\n| `<office-binary-file>` | No | `<office-macro-sign>` | .xls, .xlt, .doc, .dot, .pot, .ppa, .pps, .ppt, .mpp, .mpt, .pub, .vsd, .vst, … | Sign VBA macros in binary Microsoft Office files and templates: Project, Publisher, and legacy Excel, Word, PowerPoint and Visio |\n| `<xml-file>` | No | `<xml-sign>` | .xml | Sign XML files using XMLDSIG |\n| `<json-file>` | No | `<jsf-sign>` | .json | Sign JSON files using JSON Signature Format (JSF). |\n| `<oci-image-layout-archive-file>` | No | `<notation-sign>`, `<cosign-sign>` | .tar | Sign container images uploaded in an OCI layout file. |\n| `<directory>` | Yes | `<clickonce-sign>` |  | Specify directories within composite files, e.g. ZIP, MSI, or other directories. Can also be used to sign ClickOnce files and VSTO add-ins. |\n| `<file>` | No | `<dsse-sign>`, `<smime-sign>`, `<create-cms-signature>`, `<create-gpg-signature>`, `<create-raw-signature>`, `<custom-sign>`, `<create-custom-signature>`, | * | Create generic signatures and custom signatures for arbitrary files: DSSE, S/MIME, CMS/PKCS #7, GPG/OpenPGP, raw signatures |",
     "images": []
    },
    {
@@ -1134,7 +1134,7 @@
      "Directives and categories"
     ],
     "anchor": "directives-and-categories",
-    "text": "Signing directives are typically used in file elements or file sets, e.g.\n\n- a `<pe-file>` containing an `<authenticode-sign` directive\n- a `<pe-file>` set containing a `<for-each>` block with an `<authenticode-sign` directive\n\nThere are three major categories of signing methods:\n\n| Category | How it works | Signed file | Notes | General syntax pattern |\n| --- | --- | --- | --- | --- |\n| ##### Embedded | Adds a signature to an existing file. | Replaces original file | A signature is added, and the file’s format does not change. The signed file replaces the unsigned file for all practical purposes. Several platforms including Windows, Apple, and Java provide a variety of file formats that support embedded signatures. | `<`format`-sign />` |\n| ##### Enveloped | Adds a new file that contains the unsigned file and the signature. | Added | The signed file consists of the signature and the original file, often encoded. The original file usually needs to be extracted from the enveloped file in order to be used. Depending on the format and tool, extraction and verification are ideally a single step. Enveloped signatures are available for all file types using the `<file>` element. | `<`format`-sign output-file-name=\"...\" />` |\n| ##### Detached | Adds a new file that contains only the signature. | Added | The signature file contains the signature and a cryptographic hash code of the original file. Verify the signature before accessing the signed file. Detached signatures are available for all file types using the `<file>` element. | `<create-`format`-signature output-file-name=\"...\" />` |",
+    "text": "Signing directives are typically used in file elements or file sets, e.g.\n\n- a `<pe-file>` containing an `<authenticode-sign` directive\n- a `<pe-file>` set containing a `<for-each>` block with an `<authenticode-sign` directive\n\nThere are three major categories of signing methods:\n\n| Category | How it works | Signed file | Notes | General syntax pattern |\n| --- | --- | --- | --- | --- |\n| ##### Embedded | Adds a signature to an existing file. | Replaces original file | A signature is added, and the file’s format does not change. The signed file replaces the unsigned file for all practical purposes. Embedded formats are always platform-specific. Several platforms including Windows, Apple, and Java provide a variety of file formats with embedded signatures. | `<`format`-sign />` |\n| ##### Enveloped | Adds a new file that contains the unsigned file and the signature. | Added | The signed file consists of the signature and the original file, often encoded. The original file usually needs to be extracted from the enveloped file in order to be used. Depending on the format and tool, extraction and verification are ideally a single step. Generic enveloped signatures are available for all file types using the `<file>` element. | `<`format`-sign output-file-name=\"...\" />` |\n| ##### Detached | Adds a new file that contains only the signature. | Added | The signature file contains the signature and a cryptographic hash code of the original file. Verify the signature before accessing the signed file. Generic detached signatures are available for all file types using the `<file>` element. The file element must be contained in a composite file such as a ZIP archive. | `<create-`format`-signature output-file-name=\"...\" />` |",
     "images": []
    },
    {
@@ -1166,7 +1166,7 @@
      "Signing directives"
     ],
     "anchor": "signing-directives",
-    "text": "| Signing directive | Signing method name | Signing method category |\n| --- | --- | --- |\n| `<authenticode-sign>` | Authenticode (Windows) | Embedded |\n| `<nuget-sign>` | NuGet packages | Embedded |\n| `<office-macro-sign>` | Microsoft Office VBA macros | Embedded |\n| `<opc-sign>` | Open Packaging Convention | Embedded |\n| `<jar-sign>` | Java Archives | Embedded |\n| `<apk-sign>` | Android app packages | Embedded |\n| `<rpm-sign>` | RPM Package Manager | Embedded |\n| `<debsigs-sign>` | Debian packages | Embedded |\n| `<xml-sign>` | XML Digital Signature | Embedded |\n| `<jsf-sign>` | JSON Signature Format | Embedded |\n| `<notation-sign>` | Notary (Notation) container signature | Embedded |\n| `<cosign-sign>` | Sigstore Cosign container signature | Embedded |\n| `<dsse-sign>` | DSSE envelope signature | Enveloped |\n| `<smime-sign>` | S/MIME signature | Enveloped |\n| `<create-cms-signature>` | Cryptographic Message Syntax (CMS) | Detached |\n| `<create-gpg-signature>` | GPG/OpenPGP signature | Detached |\n| `<create-raw-signature>` | Raw signature | Detached |\n| `<clickonce-sign>` | ClickOnce application and add-in signature | Other |\n| `<custom-sign>` | Embedded custom signature | Embedded |\n| `<create-custom-signature>` | Detached custom signature | Detached |",
+    "text": "| Signing directive | Signing method name | Signing method category |\n| --- | --- | --- |\n| `<authenticode-sign>` | Authenticode (Windows) | Embedded |\n| `<nuget-sign>` | NuGet packages | Embedded |\n| `<office-macro-sign>` | Microsoft Office VBA macros | Embedded |\n| `<opc-sign>` | Open Packaging Convention | Embedded |\n| `<jar-sign>` | Java Archives | Embedded |\n| `<create-apk-signature>` | Android app packages | Embedded and Detached |\n| `<rpm-sign>` | RPM Package Manager | Embedded |\n| `<debsigs-sign>` | Debian packages | Embedded |\n| `<xml-sign>` | XML Digital Signature | Embedded |\n| `<jsf-sign>` | JSON Signature Format | Embedded |\n| `<notation-sign>` | Notary (Notation) container signature | Embedded |\n| `<cosign-sign>` | Sigstore Cosign container signature | Embedded |\n| `<dsse-sign>` | DSSE envelope signature | Enveloped |\n| `<smime-sign>` | S/MIME signature | Enveloped |\n| `<create-cms-signature>` | Cryptographic Message Syntax (CMS) | Detached |\n| `<create-gpg-signature>` | GPG/OpenPGP signature | Detached |\n| `<create-raw-signature>` | Raw signature | Detached |\n| `<clickonce-sign>` | ClickOnce application and add-in signature | Other |\n| `<custom-sign>` | Embedded custom signature | Embedded |\n| `<create-custom-signature>` | Detached custom signature | Detached |",
     "images": []
    },
    {
@@ -1221,7 +1221,7 @@
      "<jar-sign> : Java Archives"
     ],
     "anchor": "jar-sign",
-    "text": "Available for Code Signing Basic, Semantic Code Signing, Open Source Code Signing.\n\nSupported elements:\n\n| Element | Extensions | Description |\n| --- | --- | --- |\n| `<jar-file>` | .jar, .war, .ear, .aab | Java packages/archives |\n| `<zip-file>` | .zip | Use ZIP archives to sign multiple files at once or to add additional files: enveloped and detached signatures, and attestations. (ZIP archives can also be signed like JAR files.) |\n\nSupported options:\n\n| Option | Default value | Available values | Description |\n| --- | --- | --- | --- |\n| `manifest-hash-algorithm` | `sha256` | `sha256`, `sha384`, `sha512` | Hash algorithm to use when digesting the entries of a JAR file for the manifest file (`META-INF/MANIFEST.MF`) and the `META-INF/*.SF` file. Corresponds to the `jarsigner -digestalg` parameter. |\n| `hash-algorithm` | `sha256` | `sha256`, `sha384`, `sha512` | Hash algorithm to use for the actual signature. Corresponds to the hash algorithm specified with the `jarsigner -digestalg` parameter (the signature algorithm is determined by the certificate’s key). |\n\n##### Verification\n\n- Java always verifies signatures for client components. For server components, you need to create a policy. Please consult the documentation of your application server or Oracle’s documentation.\n- For signed ZIP files, the receiver needs to check the signature explicitly before unpacking the file.\n\nFor verification, use the following command (requires JDK):\n\n```\njarsigner -verify -strict <file>.zip\n```\n\nAdd the `-verbose` option to see the certificate.\n\n> **Info:** ** No longer supported for Android packages\n>\n>\n>\n> Current Android versions require signing schemes v2 or v3. Use [`<apk-sign>'](#apk-sign) instead of ``.",
+    "text": "Available for Code Signing Basic, Semantic Code Signing, Open Source Code Signing.\n\nSupported elements:\n\n| Element | Extensions | Description |\n| --- | --- | --- |\n| `<jar-file>` | .jar, .war, .ear, .aab | Java packages/archives |\n| `<zip-file>` | .zip | Use ZIP archives to sign multiple files at once or to add additional files: enveloped and detached signatures, and attestations. (ZIP archives can also be signed like JAR files.) |\n\nSupported options:\n\n| Option | Default value | Available values | Description |\n| --- | --- | --- | --- |\n| `manifest-hash-algorithm` | `sha256` | `sha256`, `sha384`, `sha512` | Hash algorithm to use when digesting the entries of a JAR file for the manifest file (`META-INF/MANIFEST.MF`) and the `META-INF/*.SF` file. Corresponds to the `jarsigner -digestalg` parameter. |\n| `hash-algorithm` | `sha256` | `sha256`, `sha384`, `sha512` | Hash algorithm to use for the actual signature. Corresponds to the hash algorithm specified with the `jarsigner -digestalg` parameter (the signature algorithm is determined by the certificate’s key). |\n\n##### Verification\n\n- Java always verifies signatures for client components. For server components, you need to create a policy. Please consult the documentation of your application server or Oracle’s documentation.\n- For signed ZIP files, the receiver needs to check the signature explicitly before unpacking the file.\n\nFor verification, use the following command (requires JDK):\n\n```\njarsigner -verify -strict <file>.zip\n```\n\nAdd the `-verbose` option to see the certificate.\n\n> **Info:** No longer supported for Android packages\n>\n>\n>\n> Current Android versions require signature schemes v2 or higher. Use `<create-apk-signature>` instead of `<jar-sign>`.",
     "images": []
    },
    {
@@ -1229,10 +1229,10 @@
      "Artifact Configuration > Reference",
      "Signing methods",
      "Signing directives",
-     "<apk-sign> : Android app packages"
+     "<create-apk-signature> : Android app packages"
     ],
-    "anchor": "apk-sign",
-    "text": "Available for Semantic Code Signing, Open Source Code Signing.\n\nSupported elements:\n\n| Element | Extensions | Description |\n| --- | --- | --- |\n| `<apk-file>` | .apk | Android app packages |\n\nAndroid app package files support signatures in different schema versions depending on the app’s SDK.\n\nSupported options:\n\n| Option | Optional | Description |\n| --- | --- | --- |\n| `min-sdk-version` | Yes | The lowest Android framework API level that `apk-sign` uses for verification compatibility. By default, `apk-sign` uses the value of the minSdkVersion attribute from the app’s manifest file. |\n| `max-sdk-version` | Yes | The highest Android framework API level that `apk-sign` uses for verification compatibility. |\n\n##### Example\n\n```xml\n<artifact-configuration xmlns=\"http://signpath.io/artifact-configuration/v1\">\n  <apk-file>\n    <apk-sign />\n  </apk-file>\n</artifact-configuration>\n```",
+    "anchor": "create-apk-signature",
+    "text": "Available for Semantic Code Signing, Open Source Code Signing.\n\nSupported elements:\n\n| Element | Extensions | Description |\n| --- | --- | --- |\n| `<apk-file>` | .apk | Android app packages |\n\nAndroid app package files support signatures in different scheme versions depending on the app’s SDK.\n\nSignatures of schemes v1 to v3 are embedded in the APK file. A v4 signature is added as a separate file next to the input APK file, named with an added `.idsig` extension (for example, `sample.apk.idsig`). Therefore, `<apk-file>` must be nested in a container such as `<zip-file>`, as shown in the example below.\n\nSupported options:\n\n| Option | Optional | Description |\n| --- | --- | --- |\n| `min-sdk-version` | Yes | The lowest Android framework API level that `create-apk-signature` uses for verification compatibility. By default, `create-apk-signature` uses the value of the minSdkVersion attribute from the app’s manifest file. |\n| `max-sdk-version` | Yes | The highest Android framework API level that `create-apk-signature` uses for verification compatibility. |\n\nThese options are equivalent to `--min-sdk-version` and `--max-sdk-version` for `apksigner`.\n\n##### Example\n\n```xml\n<artifact-configuration xmlns=\"http://signpath.io/artifact-configuration/v1\">\n  <zip-file>\n    <apk-file path=\"sample.apk\">\n      <create-apk-signature />\n    </apk-file>\n  </zip-file>\n</artifact-configuration>\n```",
     "images": []
    },
    {
@@ -1419,8 +1419,8 @@
    }
   ],
   "source": "SignPath Documentation",
-  "lastmod": "2026-09-04",
-  "hash": "c2a7dd0d364e3606f5a45cea4eb66724dd781772"
+  "lastmod": "2026-10-06",
+  "hash": "72a6ddd68cecc432ce3cb134cb3d7f1b36fef5f3"
  },
  {
   "url": "https://docs.signpath.io/artifact-configuration/syntax",
@@ -1564,7 +1564,7 @@
    }
   ],
   "source": "SignPath Documentation",
-  "lastmod": "2026-08-27",
+  "lastmod": "2026-10-06",
   "hash": "84f0ddf466c9155d0b39ef84d5a5cfc247f52810"
  },
  {
@@ -1602,7 +1602,7 @@
    }
   ],
   "source": "SignPath Documentation",
-  "lastmod": "2026-08-17",
+  "lastmod": "2026-10-06",
   "hash": "851defcfb1b2bfc1a80c22f466d741e00b393c75"
  },
  {
@@ -3171,6 +3171,72 @@
     ],
     "anchor": "",
     "text": "Component  All componentsApplicationApplication (self-hosted only)PowerShell ModuleDocker PowerShell ModuleCrypto Providers (Windows, Linux)macOS CryptoTokenKitGitHub ConnectorGitHub ActionGitLab ConnectorGitLab ComponentJenkins PluginTeamCity PluginTeamCity ConnectorAzure DevOps ExtensionAzure DevOps ConnectorSCIM ConnectorPipeline Connector\n\nChanges All changesBreaking changesUpgrade informationNew featuresImprovementsChangesBug fixes\n\n  Feed",
+    "images": []
+   },
+   {
+    "path": [
+     "Product updates",
+     "October 07, 2026",
+     "Application 1.222.1",
+     "New features:"
+    ],
+    "anchor": "",
+    "text": "- Added support for APK signature scheme v4:\n\n  - The signing directive `<apk-sign>` has been replaced with `<create-apk-signature>`.\n  - Because a v4 signature is added as a separate `.idsig` file, the `<apk-file>` element must be nested in a container such as a ZIP archive.\n  - For compatibility reasons, the legacy `<apk-sign>` directive still exists, but will be removed in a future version (in this case no ZIP archive is required).",
+    "images": []
+   },
+   {
+    "path": [
+     "Product updates",
+     "October 07, 2026",
+     "Application 1.222.1",
+     "Improvements:"
+    ],
+    "anchor": "",
+    "text": "- The `<jsf-sign>` directive now preserves property order formatting of the JSON file.",
+    "images": []
+   },
+   {
+    "path": [
+     "Product updates",
+     "October 07, 2026",
+     "Application 1.222.1",
+     "Bug fixes:"
+    ],
+    "anchor": "",
+    "text": "- Fixed: REST API Swagger descriptions contained incorrect `application/json-patch+json` content types for request body definitions.",
+    "images": []
+   },
+   {
+    "path": [
+     "Product updates",
+     "October 07, 2026",
+     "Application (self-hosted only) 1.222.1",
+     "Breaking changes:"
+    ],
+    "anchor": "",
+    "text": "- Deep signing of MSI, CAB, APPX and MSIX files now requires deploying the optional `windowssigningmethodservice` component. Enable it via the `chartSettings.windowsSigningMethodService.replicaCount` setting in the `signpath-application` chart.",
+    "images": []
+   },
+   {
+    "path": [
+     "Product updates",
+     "October 07, 2026",
+     "Application (self-hosted only) 1.222.1",
+     "New features:"
+    ],
+    "anchor": "",
+    "text": "- Self-hosted installations can now optionally provide an RFC 3161-compatible Time Stamping Authority (TSA) using a private PKI. While it cannot not produce generally accepted time stamps, it is useful for air-gapped environments. For details, see the Timestamping server section of the installation guide.\n- Added support for Utimaco u.trust HSMs (new `signpath-signservice-utimacohsm-chart` Helm chart).",
+    "images": []
+   },
+   {
+    "path": [
+     "Product updates",
+     "October 07, 2026",
+     "Application (self-hosted only) 1.222.1",
+     "Improvements:"
+    ],
+    "anchor": "",
+    "text": "- All Kubernetes Pods are now configured with memory limits. The default values can be overridden in the `chartSettings.resources` sections.\n- Several container security improvements including `automountServiceAccountToken=false` and `runAsNonRoot`.",
     "images": []
    },
    {
@@ -8818,8 +8884,8 @@
    }
   ],
   "source": "SignPath Documentation",
-  "lastmod": "2026-09-22",
-  "hash": "e00b91e82433e096647b3f5600b45767328b7a6a"
+  "lastmod": "2026-10-08",
+  "hash": "feb5f958ecbe4559606c73d4c72ab837abb47f4d"
  },
  {
   "url": "https://docs.signpath.io/powershell",

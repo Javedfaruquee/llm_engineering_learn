@@ -1,0 +1,17 @@
+# Secrets: the API key and settings live in .env (see .env.example)
+.env
+__pycache__/
+.pytest_cache/
+
+# The repo-wide .gitignore excludes *.bin (model weights), but Chroma's HNSW vector index is stored in .bin
+# files. Without them a fresh clone fails with "Error loading hnsw index", so keep them with the snapshot.
+!signpath_data/chroma/**/*.bin
+
+# Runtime state that doesn't belong in the shared snapshot: the question log (may contain personal
+# data), evaluation reports, the rollback copies of a refresh, and temporary/lock files
+signpath_data/logs/
+signpath_data/eval/
+signpath_data/*.previous.json
+signpath_data/*.tmp
+signpath_data/*.swap
+signpath_data/refresh.lock

@@ -1,4 +1,4 @@
-# Dependencies for Signpath_RAG.py, pinned to the versions tested in the project's .venv.
+# Dependencies for Signpath_RAG.py (and signpath_Ingest.py / signpath_answer.py), pinned to the versions tested in the project's .venv.
 # torch is installed separately in the Dockerfile from the CPU-only index (much smaller image).
 openai==2.54.0
 gradio==6.28.0

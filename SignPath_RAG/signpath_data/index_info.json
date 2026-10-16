@@ -1,0 +1,34 @@
+{
+ "embed_model": "text-embedding-3-large",
+ "pages": 45,
+ "chunks": 1428,
+ "last_checked": "2026-10-16 16:22 UTC",
+ "last_checked_ts": 1792167750.4925623,
+ "last_changed": "2026-10-16 16:22 UTC",
+ "newest_page_update": "2026-10-08",
+ "last_sync": {
+  "added_chunks": 14,
+  "removed_chunks": 8,
+  "added": 0,
+  "removed": 0,
+  "changed": 2
+ },
+ "quality": {
+  "mrr": 0.916,
+  "recall": 0.9653,
+  "ndcg": 0.8268,
+  "false_rejections": 2,
+  "out_of_scope_rejected": "18/35",
+  "mrr_by_set": {
+   "held-out": 0.9129,
+   "tuning": 0.9177
+  },
+  "bad_labels": 0,
+  "tests": "d54fc4757234",
+  "at": "2026-10-16 16:22 UTC"
+ },
+ "last_refresh": {
+  "at": "2026-10-16 16:22 UTC",
+  "status": "promoted"
+ }
+}

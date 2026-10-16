@@ -1,0 +1,55 @@
+# Run from this folder (see README.md):
+#   docker compose up -d --build                         # build and start on http://localhost:7860
+#   docker compose logs -f                               # watch crawling / refreshes
+#   docker compose exec signpath-rag python Signpath_RAG.py --refresh   # refresh now (quality-gated)
+#   docker compose down                                  # stop (the data volume is kept)
+#
+# Settings come from ./.env (copy .env.example): OPENAI_API_KEY plus any SIGNPATH_* options. Inside the course
+# repo you can take the key from the repo-wide file instead: docker compose --env-file ../.env up -d --build
+# (only OPENAI_API_KEY is taken from that file).
+
+# Fixed project and volume names, so they don't depend on the folder this file is in
+name: signpath-rag
+
+services:
+  signpath-rag:
+    build: .
+    image: signpath-rag
+    container_name: signpath-rag
+    # Published on localhost only by default. There are no logins, so for other machines put a TLS reverse
+    # proxy in front, or set SIGNPATH_BIND=0.0.0.0 in .env on a network where everyone may use it
+    ports:
+      - "${SIGNPATH_BIND:-127.0.0.1}:${SIGNPATH_PORT:-7860}:7860"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY must be set - put it in ./.env or pass --env-file}
+      # Fixed inside the container, whatever .env says (it may hold settings for a native install)
+      SIGNPATH_DATA_DIR: /data
+      SIGNPATH_OPEN_BROWSER: "0"
+      GRADIO_SERVER_NAME: 0.0.0.0
+      GRADIO_SERVER_PORT: "7860"
+    volumes:
+      - signpath-data:/data
+    restart: unless-stopped
+    # Hardening: nothing but /data and /tmp is writable, no Linux capabilities, bounded resources and logs
+    read_only: true
+    tmpfs:
+      - /tmp:size=512m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    mem_limit: 4g
+    cpus: 2
+    pids_limit: 512
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+volumes:
+  signpath-data:
+    name: signpath-rag-data

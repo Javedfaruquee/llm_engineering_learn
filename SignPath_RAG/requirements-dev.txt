@@ -1,0 +1,3 @@
+# Test dependencies (offline unit tests in tests/):  pip install -r requirements-dev.txt && python -m pytest -q
+-r requirements.txt
+pytest==8.4.2
