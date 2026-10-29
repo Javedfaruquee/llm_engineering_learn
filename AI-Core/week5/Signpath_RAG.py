@@ -26,6 +26,12 @@ Usage (run with the project's .venv):
     python week5/Signpath_RAG.py --eval-retrieval  # measure search quality: MRR, nDCG@K, Recall@K, Precision@K
     python week5/Signpath_RAG.py --ask "How do I install the Windows KSP?"   # answer in the terminal
     docker exec signpath-rag python Signpath_RAG.py --refresh --eval # for dockerized referesh
+Choosing the chat model (in .env, or with docker run -e):
+    SIGNPATH_LLM_PROVIDER  openai (default), anthropic or gemini; needs OPENAI_API_KEY plus that provider's
+                           key (ANTHROPIC_API_KEY / GOOGLE_API_KEY), since embeddings always use OpenAI
+    SIGNPATH_LLM_MODEL     overrides the provider's default: gpt-4.1-mini, claude-sonnet-4-6, gemini-3.1-flash-lite
+Other settings: SIGNPATH_SHOW_EVALUATION=0 hides the developers' Evaluation tab (the Docker image's default),
+SIGNPATH_LOGO sets the header logo ("none" hides it). Each user's past conversations are saved in their own browser.
 Keeping the data fresh: while the UI runs, the docs are re-crawled every SIGNPATH_REFRESH_HOURS (default 360).
 Only new or changed sections are re-embedded, a crawl that finds far fewer pages than before is rejected,
 and the running app reloads the index on its next question. See week5/Dockerfile to run it as a container.
@@ -51,10 +57,11 @@ from urllib.robotparser import RobotFileParser
 import requests
 from bs4 import BeautifulSoup, Comment, NavigableString, Tag
 from dotenv import load_dotenv
-from openai import OpenAI
+from openai import BadRequestError, NotFoundError, OpenAI
 
 warnings.filterwarnings("ignore")
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+load_dotenv(override=True)   # before the settings below, so SIGNPATH_* values in .env take effect
 
 # ---------------------------------------------------------------------------
 # Settings
@@ -82,8 +89,26 @@ REFRESH_HOURS = float(os.getenv("SIGNPATH_REFRESH_HOURS", "360"))  # background 
 MIN_PAGE_RATIO = 0.8     # a refresh that finds fewer than 80% of the previous pages is treated as a failed crawl
 OPEN_BROWSER = os.getenv("SIGNPATH_OPEN_BROWSER", "1") == "1"
 UI_UPDATE_SECONDS = float(os.getenv("SIGNPATH_UI_UPDATE_SECONDS", "0.15"))  # stream to the browser in batches at most this often (see respond)
+# Logo in the UI header: an SVG or PNG file, or "none" to hide it. Default: the Hexagon logo next to this script.
+LOGO = os.getenv("SIGNPATH_LOGO", str(Path(__file__).parent / "hexagon_logo.svg"))
+# The Evaluation tab is for developers: each run costs ~100 embedding calls. Shown by default when run as a
+# script; the Docker image hides it unless built with SHOW_EVALUATION=1 (the :dev tag) or run with this set to 1.
+SHOW_EVALUATION = os.getenv("SIGNPATH_SHOW_EVALUATION", "1") == "1"
+MAX_SAVED_CONVERSATIONS = 25   # conversations kept in each user's browser (see the history helpers before launch_ui)
 
-LLM_MODEL = "gpt-4.1-mini"
+# Chat provider and model for answers. OpenAI, Anthropic (Claude) and Google (Gemini) all offer an
+# OpenAI-compatible API, so only the address and key differ. Set SIGNPATH_LLM_PROVIDER to pick one, and
+# SIGNPATH_LLM_MODEL to override its default model. Embeddings always come from OpenAI (OPENAI_API_KEY):
+# the index is built with them, changing them means re-indexing everything, and Anthropic has none.
+LLM_PROVIDERS = {
+    # provider: (OpenAI-compatible base URL, env var holding its API key, default chat model)
+    "openai": (None, "OPENAI_API_KEY", "gpt-4.1-mini"),
+    # claude-sonnet-4-6 rather than a Claude 5 model: those reject temperature (see DETERMINISTIC)
+    "anthropic": ("https://api.anthropic.com/v1/", "ANTHROPIC_API_KEY", "claude-sonnet-4-6"),
+    "gemini": ("https://generativelanguage.googleapis.com/v1beta/openai/", "GOOGLE_API_KEY", "gemini-3.1-flash-lite"),
+}
+LLM_PROVIDER = os.getenv("SIGNPATH_LLM_PROVIDER", "openai").strip().lower()   # checked in main()
+LLM_MODEL = os.getenv("SIGNPATH_LLM_MODEL") or LLM_PROVIDERS.get(LLM_PROVIDER, LLM_PROVIDERS["openai"])[2]
 EMBED_MODEL = "text-embedding-3-large"
 RERANK_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 
@@ -1043,9 +1068,48 @@ def remove_stray_refusal(answer):
     return cleaned or answer
 
 
+# temperature=0 makes the LLM always pick its most likely next token, and the fixed seed pins down what is
+# left, so the same question gets the same answer. (It doesn't stop hallucination by itself: that's the job
+# of the relevance gate and the answer-only-from-the-excerpts prompt.) Some models reject one of these - e.g.
+# gpt-5-mini and the Claude 5 models reject temperature, Gemini rejects seed - and for those the setting is
+# dropped (see chat_completion) and a warning logged.
+DETERMINISTIC = {"temperature": 0, "seed": 42}
+unsupported_settings = set()       # DETERMINISTIC keys that LLM_MODEL rejected; learnt on first use
+
+
+def make_llm_client():
+    """An OpenAI client for the chat model, pointed at LLM_PROVIDER's OpenAI-compatible API."""
+    base_url, key_name, _ = LLM_PROVIDERS[LLM_PROVIDER]
+    # Anthropic's API needs a version header for model lookups (main's startup check); chat ignores it
+    headers = {"anthropic-version": "2023-06-01"} if LLM_PROVIDER == "anthropic" else None
+    return OpenAI(base_url=base_url, api_key=os.getenv(key_name), default_headers=headers)
+
+
+def chat_completion(client, **request):
+    """client.chat.completions.create with LLM_MODEL and the DETERMINISTIC settings.
+    If the model rejects one of those settings, retry without it, and leave it out from then on."""
+    while True:
+        settings = {k: v for k, v in DETERMINISTIC.items() if k not in unsupported_settings}
+        try:
+            return client.chat.completions.create(model=LLM_MODEL, **settings, **request)
+        except BadRequestError as error:
+            # OpenAI names the rejected parameter in error.param; other providers only in the message,
+            # e.g. Gemini: 'Unknown name "seed": Cannot find field.'
+            rejected = next((k for k in settings if k == error.param or re.search(rf"\b{k}\b", str(error))), None)
+            if rejected is None:
+                raise
+            unsupported_settings.add(rejected)
+            if rejected == "temperature":
+                effect = "so answers may vary between runs. For repeatable answers use a model that supports it"
+            else:
+                effect = "but temperature=0 still applies, so answers stay largely repeatable"
+            log(f"WARNING: {LLM_MODEL} does not support {rejected}={settings[rejected]}, {effect}.")
+
+
 class SignPathAssistant:
     def __init__(self):
-        self.client = OpenAI()
+        self.client = OpenAI()                  # embeddings, for the search (always OpenAI)
+        self.llm_client = make_llm_client()     # chat, at LLM_PROVIDER
         self.retriever = Retriever(self.client)
 
     def standalone_question(self, question, history):
@@ -1055,8 +1119,8 @@ class SignPathAssistant:
             return question
         conversation = [m for m in history if not is_image_caption(message_text(m))]
         transcript = "\n".join(f"{m['role']}: {message_text(m)[:1500]}" for m in conversation[-6:])
-        response = self.client.chat.completions.create(
-            model=LLM_MODEL, temperature=0, seed=42,
+        response = chat_completion(
+            self.llm_client,
             messages=[{"role": "system", "content": CONDENSE_PROMPT},
                       {"role": "user", "content": f"Conversation:\n{transcript}\n\nLatest message: {question}"}],
         )
@@ -1074,11 +1138,11 @@ class SignPathAssistant:
             return
 
         # 3. Give the LLM the numbered excerpts (with each page's last-updated date) and stream its answer.
-        #    temperature=0 and a fixed seed make the same question get the same answer.
+        #    temperature=0 and a fixed seed make the same question get the same answer (see DETERMINISTIC).
         excerpts = "\n\n---\n\n".join(
             f"[{n}] Last updated: {hit.meta.get('lastmod') or 'unknown'}\n{hit.text}" for n, hit in enumerate(relevant, start=1))
-        stream = self.client.chat.completions.create(
-            model=LLM_MODEL, temperature=0, seed=42, stream=True,
+        stream = chat_completion(
+            self.llm_client, stream=True,
             messages=[{"role": "system", "content": SYSTEM_PROMPT},
                       {"role": "user", "content": f"Documentation excerpts:\n\n{excerpts}\n\n---\n\nQuestion: {query}"}],
         )
@@ -1376,11 +1440,13 @@ CARD_LABELS = {"MRR": "Mean Reciprocal Rank (MRR)", "nDCG": "Normalized DCG (nDC
 def metric_card(label, value, thresholds, text=None):
     """One coloured metric box, in the style of week5/evaluator.py."""
     green, amber = thresholds
-    color = "green" if value >= green else "orange" if value >= amber else "red"
+    color = "#16a34a" if value >= green else "#d97706" if value >= amber else "#dc2626"
+    # Gradio's theme variables (var(--...)) keep the cards readable in both light and dark mode
     return f"""
-    <div style="margin: 10px 0; padding: 15px; background-color: #f5f5f5; border-radius: 8px; border-left: 5px solid {color};">
-        <div style="font-size: 14px; color: #666; margin-bottom: 5px;">{label}</div>
-        <div style="font-size: 28px; font-weight: bold; color: {color};">{text or f'{value:.4f}'}</div>
+    <div style="margin: 10px 0; padding: 14px 16px; background: var(--background-fill-secondary);
+                border: 1px solid var(--border-color-primary); border-left: 4px solid {color}; border-radius: 8px;">
+        <div style="font-size: 13px; color: var(--body-text-color-subdued); margin-bottom: 4px;">{label}</div>
+        <div style="font-size: 26px; font-weight: 600; color: {color};">{text or f'{value:.4f}'}</div>
     </div>"""
 
 
@@ -1401,10 +1467,9 @@ def evaluation_report(result):
                          text=f"{to_llm['Precision']:.4f} · {result['avg_excerpts_sent']:.1f} excerpts on average")
     cards += metric_card("Relevance gate (refuses out-of-scope, answers in-scope)", gate_score, CARD_THRESHOLDS["Gate"],
                          text=f"{oos['rejected']}/{oos['total']} rejected · {result['false_rejections']} wrongly")
-    cards += ("<div style='margin-top: 20px; padding: 10px; background-color: #d4edda; border-radius: 5px; "
-              "text-align: center; border: 1px solid #c3e6cb;'><span style='font-size: 14px; color: #155724; "
-              f"font-weight: bold;'>✓ Evaluation complete: {answerable} answerable + {oos['total']} out-of-scope questions"
-              "</span></div>")
+    cards += ("<div style='margin-top: 20px; padding: 10px; border-radius: 8px; text-align: center; "
+              "border: 1px solid #16a34a; color: #16a34a; font-size: 14px; font-weight: 600;'>"
+              f"✓ Evaluation complete: {answerable} answerable + {oos['total']} out-of-scope questions</div>")
 
     chart = pd.DataFrame([{"Category": category, "Average MRR": value}
                           for category, value in result["by_category"].items()])
@@ -1435,11 +1500,70 @@ def index_status():
     info = read_index_info()
     if not info:
         return ""
-    status = (f"📚 {info.get('pages', '?')} pages · {info.get('chunks', '?')} chunks · "
+    status = (f"{info.get('pages', '?')} pages · {info.get('chunks', '?')} chunks · "
               f"docs last checked {info.get('last_checked', '?')} · index last changed {info.get('last_changed', '?')}")
     if REFRESH_HOURS > 0:
         status += f" · auto-refresh every {REFRESH_HOURS:g}h"
     return status
+
+
+# Look and feel. The colours come from the Gradio theme's variables (var(--...)), so the page works in
+# both light and dark mode; the logo is drawn in the text colour for the same reason.
+UI_CSS = """
+.app-header { display: flex; align-items: center; gap: 18px; padding: 14px 20px;
+              border: 1px solid var(--border-color-primary); border-radius: 12px;
+              background: var(--block-background-fill); }
+.app-header .brand-logo { color: var(--body-text-color); }
+.app-header .brand-logo svg { height: 30px; width: auto; display: block; fill: currentColor; }
+.app-header .brand-logo img { height: 30px; width: auto; display: block; }
+.app-header .divider { width: 1px; align-self: stretch; background: var(--border-color-primary); }
+.app-header h1 { font-size: 20px; font-weight: 600; margin: 0; line-height: 1.25; }
+.app-header p { margin: 2px 0 0; font-size: 13px; color: var(--body-text-color-subdued); }
+.app-header p a { display: inline; padding: 0 !important; margin: 0 !important; color: var(--link-text-color); }
+.header-block { padding: 0 !important; }
+.index-status, .index-status * { font-size: 12px !important; color: var(--body-text-color-subdued) !important; }
+.app-header .model-badge { margin-left: auto; font-size: 12px; padding: 4px 12px; white-space: nowrap;
+                           border: 1px solid var(--border-color-primary); border-radius: 999px;
+                           color: var(--body-text-color-subdued); }
+.app-footer { font-size: 12px; color: var(--body-text-color-subdued); text-align: center; padding-top: 8px; }
+@media (max-width: 720px) {
+  .app-header { flex-wrap: wrap; }
+  .app-header .divider { display: none; }
+  .app-header .model-badge { margin-left: 0; }
+}
+"""
+
+
+def logo_html():
+    """The header logo as HTML: an SVG file is inlined (so CSS can colour it), other images embedded as data."""
+    import base64
+
+    path = Path(LOGO)
+    if LOGO.strip().lower() in ("", "none") or not path.is_file():
+        return ""
+    if path.suffix.lower() == ".svg":
+        svg = path.read_text(encoding="utf-8")
+        return svg[svg.index("<svg"):]          # drop the <?xml ...?> line in front of the <svg> element
+    mime = "image/png" if path.suffix.lower() == ".png" else "image/jpeg"
+    return f'<img src="data:{mime};base64,{base64.b64encode(path.read_bytes()).decode()}" alt="Logo">'
+
+
+def header_html():
+    """The page header: logo, title, what the answers are based on, and which model answers."""
+    sources = " and ".join(f'<a href="{s["start"]}" target="_blank">{s["name"]}</a>' for s in SOURCES)
+    logo = logo_html()
+    branding = f'<div class="brand-logo">{logo}</div><div class="divider"></div>' if logo else ""
+    return f"""
+    <div class="app-header">
+      {branding}
+      <div>
+        <h1>SignPath Documentation Assistant</h1>
+        <p>Answers come only from the {sources}. If they don't cover a question, it says so.</p>
+      </div>
+      <div class="model-badge" title="Chat model (SIGNPATH_LLM_PROVIDER / SIGNPATH_LLM_MODEL)">
+        {LLM_MODEL} · {LLM_PROVIDER}
+      </div>
+    </div>"""
 
 
 def start_auto_refresh():
@@ -1456,6 +1580,58 @@ def start_auto_refresh():
 
     threading.Thread(target=loop, name="signpath-refresh", daemon=True).start()
     log(f"Auto-refresh every {REFRESH_HOURS:g} hours")
+
+
+# Conversation history. Each user's past conversations are kept in their own browser (Gradio's BrowserState,
+# i.e. the browser's localStorage), not on the server: nothing is shared between users, so it stays private
+# even when many people use one container, and no login is needed. It doesn't follow a user to another browser.
+
+def browser_state_secret():
+    """Key that encrypts the history in the browser. Gradio's default changes on every restart, which would make
+    all saved history unreadable, so one is generated once per deployment and kept in the data folder."""
+    import secrets
+
+    secret_file = DATA_DIR / "browser_state_secret"
+    if not secret_file.exists():
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        secret_file.write_text(secrets.token_hex(32), encoding="utf-8")
+    return secret_file.read_text(encoding="utf-8").strip()
+
+
+def compact_message(message):
+    """A chat message as stored in the history: its text, or an image's file path (not the whole file record)."""
+    content = message.get("content", "")
+    parts = content if isinstance(content, list) else [content]
+    for part in parts:
+        if isinstance(part, dict) and ("file" in part or "path" in part):
+            file = part.get("file") or part
+            return {"role": message["role"], "content": {"path": file.get("path"), "alt_text": part.get("alt_text")}}
+    text = "".join(p.get("text", "") if isinstance(p, dict) else str(p) for p in parts)
+    return {"role": message["role"], "content": text}
+
+
+def restore_messages(messages):
+    """Saved messages back into the chat, leaving out images whose file no longer exists (e.g. after a re-crawl)."""
+    return [m for m in messages if not isinstance(m["content"], dict) or Path(m["content"].get("path") or "").is_file()]
+
+
+def history_choices(saved):
+    """The sidebar list: (label, conversation id) pairs, most recent first."""
+    return [(f"{c['title']}  ·  {c['updated']}", c["id"]) for c in saved]
+
+
+def save_conversation(chat, conversation_id, saved):
+    """Store the current chat in the browser history (new entry, or update of the open one), newest first."""
+    import uuid
+
+    if not chat:
+        return conversation_id, saved, history_choices(saved)
+    conversation_id = conversation_id or uuid.uuid4().hex
+    first_question = next((message_text(m) for m in chat if m["role"] == "user"), "Conversation")
+    record = {"id": conversation_id, "title": first_question.strip()[:60], "updated": time.strftime("%Y-%m-%d %H:%M"),
+              "messages": [compact_message(m) for m in chat]}
+    saved = [record] + [c for c in saved if c["id"] != conversation_id]
+    return conversation_id, saved[:MAX_SAVED_CONVERSATIONS], history_choices(saved[:MAX_SAVED_CONVERSATIONS])
 
 
 def launch_ui(assistant):
@@ -1504,48 +1680,93 @@ def launch_ui(assistant):
         result = evaluate_retrieval(assistant, EVAL_K, progress=lambda fraction, text: progress(fraction, desc=text))
         return evaluation_report(result)
 
-    with gr.Blocks(title="SignPath Docs Assistant") as ui:
-        sources_md = " and ".join(f"[{s['name']}]({s['start']})" for s in SOURCES)
-        gr.Markdown("# SignPath Documentation Assistant\nAnswers come only from the indexed "
-                    f"{sources_md}. If they don't cover a question, it says so.")
-        gr.Markdown(index_status)  # re-evaluated on every page load, so it shows the latest refresh
-        with gr.Tab("💬 Chat"):
-            with gr.Row():
+    no_sources = "### Sources\n_The documentation sections behind each answer appear here._"
+
+    def new_conversation():
+        """Empty chat; nothing selected in the history list."""
+        return "", [], no_sources, "", None, gr.update(value=None)
+
+    def open_conversation(conversation_id, saved):
+        """Show a conversation picked in the history list; asking more questions continues it."""
+        record = next((c for c in saved if c["id"] == conversation_id), None)
+        if record is None:
+            return new_conversation()
+        return "", restore_messages(record["messages"]), no_sources, "", conversation_id, gr.skip()
+
+    def delete_conversation(conversation_id, saved):
+        """Remove the selected conversation from the history (and close it)."""
+        saved = [c for c in saved if c["id"] != conversation_id]
+        return (*new_conversation()[:5], gr.update(choices=history_choices(saved), value=None), saved)
+
+    with gr.Blocks(title="SignPath Documentation Assistant") as ui:
+        saved = gr.BrowserState([], storage_key="signpath-rag-conversations", secret=browser_state_secret())
+        conversation_id = gr.State(None)          # id of the open conversation in `saved`; None = not saved yet
+
+        with gr.Sidebar(label="Conversations"):
+            gr.Markdown("**Recent conversations**")
+            history_list = gr.Radio(choices=[], show_label=False, container=False)
+            delete = gr.Button("Delete selected", size="sm", variant="secondary")
+            gr.Markdown(f"Your last {MAX_SAVED_CONVERSATIONS} conversations are kept in this browser only.",
+                        elem_classes="index-status")
+
+        gr.HTML(header_html(), elem_classes="header-block")
+        gr.Markdown(index_status, elem_classes="index-status")  # re-evaluated on every page load: shows the latest refresh
+        # With the Evaluation tab hidden there's nothing to switch to, so the assistant isn't put in a tab at all
+        with gr.Tab("Assistant") if SHOW_EVALUATION else gr.Column():
+            with gr.Row(equal_height=False):
                 with gr.Column(scale=3):
-                    chatbot = gr.Chatbot(label="Chat", height=620)
+                    chatbot = gr.Chatbot(label="Conversation", height=600)
                     question = gr.Textbox(placeholder="Ask about setup, configuration, crypto providers, build integrations...",
                                           show_label=False, lines=2)
                     with gr.Row():
-                        send = gr.Button("Ask", variant="primary")
-                        clear = gr.Button("Clear")
-                    gr.Examples(EXAMPLES, inputs=question)
+                        send = gr.Button("Ask", variant="primary", scale=3)
+                        clear = gr.Button("New conversation", variant="secondary", scale=1)
+                    gr.Examples(EXAMPLES, inputs=question, label="Example questions")
                 with gr.Column(scale=2):
-                    sources = gr.Markdown("### Sources\n_Sources for each answer appear here._")
+                    sources = gr.Markdown(no_sources)
                     with gr.Accordion("Retrieval details (ranking)", open=False):
                         context = gr.Markdown()
 
-        with gr.Tab("📊 Evaluation"):
-            gr.Markdown("## 🔍 Retrieval evaluation\n"
-                        f"Runs the {RETRIEVAL_TESTS_FILE.name} test questions through the search over the vector "
-                        "database and checks whether the sections that answer them are found and ranked high. "
-                        "Takes about 4 minutes; one small embedding call per question, no LLM calls.")
-            evaluate_button = gr.Button("Run Evaluation", variant="primary", size="lg")
-            with gr.Row():
-                with gr.Column(scale=1):
-                    evaluation_cards = gr.HTML("<div style='padding: 20px; text-align: center; color: #999;'>"
-                                               "Click 'Run Evaluation' to start</div>")
-                with gr.Column(scale=1):
-                    evaluation_chart = gr.BarPlot(x="Category", y="Average MRR", title="Average MRR by Category",
-                                                  y_lim=[0, 1], height=400, x_label_angle=-35)
-            evaluation_details = gr.Markdown()
+        if SHOW_EVALUATION:
+            with gr.Tab("Evaluation"):
+                gr.Markdown("### Retrieval evaluation\n"
+                            f"Runs the {RETRIEVAL_TESTS_FILE.name} test questions through the search over the vector "
+                            "database and checks whether the sections that answer them are found and ranked high. "
+                            "Takes about 4 minutes; one small embedding call per question, no LLM calls.")
+                evaluate_button = gr.Button("Run evaluation", variant="primary")
+                with gr.Row():
+                    with gr.Column(scale=1):
+                        evaluation_cards = gr.HTML("<div style='padding: 20px; text-align: center; "
+                                                   "color: var(--body-text-color-subdued);'>"
+                                                   "Click 'Run evaluation' to start</div>")
+                    with gr.Column(scale=1):
+                        evaluation_chart = gr.BarPlot(x="Category", y="Average MRR", title="Average MRR by category",
+                                                      y_lim=[0, 1], height=400, x_label_angle=-35)
+                evaluation_details = gr.Markdown()
+            evaluate_button.click(run_evaluation, None, [evaluation_cards, evaluation_chart, evaluation_details])
 
+        gr.HTML("<div class='app-footer'>Answers are generated by an AI model from the SignPath documentation. "
+                "Check important details against the linked sources.</div>")
+
+        # Asking: stream the answer, then save the conversation to the browser history
         outputs = [question, chatbot, sources, context]
-        question.submit(respond, [question, chatbot], outputs)
-        send.click(respond, [question, chatbot], outputs)
-        clear.click(lambda: ("", [], "### Sources", ""), None, outputs)
-        evaluate_button.click(run_evaluation, None, [evaluation_cards, evaluation_chart, evaluation_details])
+        def save_and_list(chat, current_id, stored):
+            """Save the chat, then show it in the history list as the selected conversation."""
+            current_id, stored, choices = save_conversation(chat, current_id, stored)
+            return current_id, stored, gr.update(choices=choices, value=current_id)
 
-    ui.launch(inbrowser=OPEN_BROWSER, allowed_paths=[str(DATA_DIR)])
+        save = (save_and_list, [chatbot, conversation_id, saved], [conversation_id, saved, history_list])
+        question.submit(respond, [question, chatbot], outputs).then(*save)
+        send.click(respond, [question, chatbot], outputs).then(*save)
+        clear.click(new_conversation, None, outputs + [conversation_id, history_list])
+        # History: fill the list when the page opens; open or delete a conversation from it
+        ui.load(lambda stored: gr.update(choices=history_choices(stored), value=None), [saved], [history_list])
+        history_list.input(open_conversation, [history_list, saved], outputs + [conversation_id, history_list])
+        delete.click(delete_conversation, [history_list, saved], outputs + [conversation_id, history_list, saved])
+
+    theme = gr.themes.Soft(primary_hue="blue", neutral_hue="slate",
+                           font=[gr.themes.GoogleFont("Inter"), "ui-sans-serif", "system-ui", "sans-serif"])
+    ui.launch(inbrowser=OPEN_BROWSER, allowed_paths=[str(DATA_DIR)], theme=theme, css=UI_CSS, footer_links=[])
 
 
 # ---------------------------------------------------------------------------
@@ -1566,10 +1787,19 @@ def main():
     parser.add_argument("--ask", help="answer one question in the terminal instead of launching the UI")
     args = parser.parse_args()
 
-    load_dotenv(override=True)
-    if not os.getenv("OPENAI_API_KEY"):
-        sys.exit("OPENAI_API_KEY is not set (add it to your .env file or pass it to the container)")
+    if LLM_PROVIDER not in LLM_PROVIDERS:
+        sys.exit(f"Unknown SIGNPATH_LLM_PROVIDER '{LLM_PROVIDER}' - use one of: {', '.join(LLM_PROVIDERS)}")
+    # OpenAI's key is always needed (embeddings); the chat provider's key too, if it's another provider
+    for key_name in dict.fromkeys(["OPENAI_API_KEY", LLM_PROVIDERS[LLM_PROVIDER][1]]):
+        if not os.getenv(key_name):
+            sys.exit(f"{key_name} is not set (add it to your .env file or pass it to the container)")
     client = OpenAI()
+    # Fail now, not on the first question, if SIGNPATH_LLM_MODEL names a model the provider doesn't have
+    try:
+        make_llm_client().models.retrieve(LLM_MODEL)
+    except NotFoundError:
+        sys.exit(f"Chat model '{LLM_MODEL}' was not found at {LLM_PROVIDER} - check SIGNPATH_LLM_MODEL")
+    log(f"Chat model: {LLM_MODEL} ({LLM_PROVIDER})")
 
     if args.crawl or not PAGES_FILE.exists():
         log(f"Crawling {', '.join(s['start'] for s in SOURCES)} ...")
