@@ -1,10 +1,16 @@
-# Run from the week5 folder:
-#   docker compose --env-file ../.env up -d --build     # build and start on http://localhost:7860
+# Run from the week5 folder (the .env file is in the repo root, two levels up):
+#   docker compose --env-file ../../.env up -d --build  # build and start on http://localhost:7860
 #   docker compose logs -f                               # watch crawling / refreshes
 #   docker compose exec signpath-rag python Signpath_RAG.py --refresh --eval   # refresh now and check answers
 #   docker compose down                                  # stop (the data volume is kept)
 #
-# Only OPENAI_API_KEY is passed into the container, not the rest of the .env file.
+# Only the variables listed under environment are passed into the container, not the rest of the .env file.
+# To answer with Claude or Gemini, add to that .env file:
+#   SIGNPATH_LLM_PROVIDER=anthropic   (needs ANTHROPIC_API_KEY)   or   gemini   (needs GOOGLE_API_KEY)
+#   SIGNPATH_LLM_MODEL=...            (optional; defaults: gpt-4.1-mini, claude-sonnet-4-6, gemini-3.1-flash-lite)
+# Answers are most repeatable with models that accept temperature=0 (the defaults do; Claude 5 models don't).
+# Note: a variable already set in your shell or Windows environment wins over the --env-file value.
+# OPENAI_API_KEY is always required: the search's embeddings come from OpenAI whichever provider answers.
 
 services:
   signpath-rag:
@@ -14,8 +20,13 @@ services:
     ports:
       - "7860:7860"
     environment:
-      OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY must be set - pass --env-file ../.env}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY must be set - pass --env-file ../../.env}
+      SIGNPATH_LLM_PROVIDER: ${SIGNPATH_LLM_PROVIDER:-openai}
+      SIGNPATH_LLM_MODEL: ${SIGNPATH_LLM_MODEL:-}           # empty = the provider's default model
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
       # SIGNPATH_REFRESH_HOURS: "24"   # override the script's default re-crawl interval
+      # SIGNPATH_SHOW_EVALUATION: "1"  # show the developers' Evaluation tab (hidden in the default build)
     volumes:
       - signpath-data:/data
     restart: unless-stopped

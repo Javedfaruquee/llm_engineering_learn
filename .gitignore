@@ -126,3 +126,6 @@ vector_db/
 # ---- Logs & local scratch output ----
 *.log
 report.txt
+
+# ---- Company branding: kept out of this public repo; only built into internal images ----
+AI-Core/week5/hexagon_logo.svg
